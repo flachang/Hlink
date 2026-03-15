@@ -232,11 +232,11 @@ export default function App() {
           <span>Hlink</span>
         </div>
         <div className="topbar-actions">
-          {localInfo && localInfo.port > 0 && (
+          {/* {localInfo && localInfo.port > 0 && (
             <button className="btn-icon" onClick={() => setShowQr(true)} title="显示二维码让手机扫码连接">
               <QrCode size={16} />
             </button>
-          )}
+          )} */}
           <button className="btn-icon" onClick={() => setShowManual(v => !v)} title="手动输入 IP 连接">
             <PlusCircle size={16} />
           </button>
