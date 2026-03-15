@@ -59,6 +59,9 @@ export default function ClipHistory({ history }: Props) {
         canvas.width = info.w;
         canvas.height = info.h;
         const ctx = canvas.getContext("2d")!;
+        // 先填白色背景，避免透明区域显示为灰色棋盘格，也能让黑色内容可见
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, info.w, info.h);
         const imageData = new ImageData(new Uint8ClampedArray(bytes), info.w, info.h);
         ctx.putImageData(imageData, 0, 0);
         setPreviewSrc(canvas.toDataURL("image/png"));
@@ -234,6 +237,8 @@ export default function ClipHistory({ history }: Props) {
               maxHeight: "75vh",
               borderRadius: "8px",
               objectFit: "contain",
+              background: "#ffffff",
+              boxShadow: "0 0 0 1px rgba(255,255,255,0.1)",
             }}
             onClick={(e) => e.stopPropagation()}
           />
