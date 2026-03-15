@@ -11,6 +11,11 @@ use tracing::{error, info};
 use crate::clipboard::{self, ClipContent};
 use crate::server;
 
+/// 最后一次"由远端写入本地剪贴板"的内容，用于防止轮询把它重新广播出去
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+static LAST_WRITTEN: Lazy<Arc<Mutex<Option<ClipContent>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(None)));
+
 /// 网络传输的剪贴板消息结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClipPayload {
@@ -152,6 +157,17 @@ pub fn start_poll(device_id: String, app: tauri::AppHandle) {
 
                 if changed {
                     last = Some(current.clone());
+
+                    // 若该内容是由远端写入的（apply_desktop_clip），跳过广播和历史记录
+                    {
+                        let mut lw = LAST_WRITTEN.lock().unwrap();
+                        if lw.as_ref() == Some(&current) {
+                            info!("Desktop poll: skipping remote-written content to avoid echo");
+                            *lw = None; // 消费掉，下次轮询不再跳过
+                            continue;
+                        }
+                    }
+
                     if let Some(payload) = clip_to_payload(&id, current) {
                         push_history(&payload);
                         server::broadcast_clip(&payload);
@@ -171,17 +187,30 @@ pub fn start_poll(device_id: String, app: tauri::AppHandle) {
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn apply_desktop_clip(payload: &ClipPayload) {
     match payload.kind {
-        ClipKind::Text => clipboard::write_text(&payload.payload),
+        ClipKind::Text => {
+            let content = ClipContent::Text(payload.payload.clone());
+            clipboard::write_text(&payload.payload);
+            // 记录写入的内容，防止轮询把它当作新内容重新广播
+            *LAST_WRITTEN.lock().unwrap() = Some(content);
+        }
         ClipKind::Image => {
             let (Some(w), Some(h)) = (payload.width, payload.height) else {
                 return;
             };
             match B64.decode(&payload.payload) {
-                Ok(bytes) => clipboard::write_image(w, h, bytes),
+                Ok(bytes) => {
+                    let content = ClipContent::Image { width: w, height: h, bytes: bytes.clone() };
+                    clipboard::write_image(w, h, bytes);
+                    *LAST_WRITTEN.lock().unwrap() = Some(content);
+                }
                 Err(e) => error!("Image base64 decode failed: {e}"),
             }
         }
-        ClipKind::File => clipboard::write_text(&payload.payload),
+        ClipKind::File => {
+            let content = ClipContent::Text(payload.payload.clone());
+            clipboard::write_text(&payload.payload);
+            *LAST_WRITTEN.lock().unwrap() = Some(content);
+        }
     }
 }
 
@@ -229,6 +258,22 @@ pub fn push_history_with_path(payload: &ClipPayload, file_path: Option<String>) 
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
+
+    // ── 去重：5 秒内相同 kind + payload 只记录一次 ──────────────
+    {
+        let history = HISTORY.lock().unwrap();
+        let dedup_window = 5u64; // 秒
+        for entry in history.iter().take(10) {
+            if entry.kind == payload.kind
+                && timestamp.saturating_sub(entry.timestamp) <= dedup_window
+                && entry.preview == preview
+                // 图片用 preview 去重（"[图片]" 相同），文本用 preview 去重
+            {
+                info!("push_history: duplicate within {}s, skipping ({:?})", dedup_window, payload.kind);
+                return;
+            }
+        }
+    }
 
     // 图片数据单独存储，不放入 HistoryEntry（避免 IPC 大数据传输问题）
     // 存储格式：JSON { "fmt": "png"|"rgba", "data": base64, "w": width, "h": height }
