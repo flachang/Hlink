@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Link2, ToggleLeft, ToggleRight, RefreshCw, PlusCircle, X, QrCode } from "lucide-react";
+import { Link2, ToggleLeft, ToggleRight, RefreshCw, PlusCircle, X } from "lucide-react";
 import DeviceList from "./components/DeviceList";
 import ClipHistory from "./components/ClipHistory";
 import QrConnect from "./components/QrConnect";
