@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Debug 构建：信任用户安装的证书（Tauri dev server 自签名证书） -->
+    <!--
+        Hlink 是纯局域网工具，所有通信均在私有网络内进行（ws://）。
+        允许明文流量，以支持 WebSocket 连接到任意局域网 IP。
+    -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Debug 构建：额外信任用户安装的证书（Tauri dev server 自签名证书） -->
     <debug-overrides>
         <trust-anchors>
             <certificates src="system" />
             <certificates src="user" />
         </trust-anchors>
     </debug-overrides>
-    <!-- 允许对开发机 IP 使用明文 HTTP -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">192.168.1.4</domain>
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">10.0.2.2</domain>
-    </domain-config>
 </network-security-config>

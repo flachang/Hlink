@@ -17,7 +17,8 @@ android {
     compileSdk = 36
     namespace = "com.zdy520.hlink"
     defaultConfig {
-        manifestPlaceholders["usesCleartextTraffic"] = "false"
+        // Hlink 是局域网工具，需要允许 ws:// 明文连接（网络安全由 network_security_config.xml 控制）
+        manifestPlaceholders["usesCleartextTraffic"] = "true"
         applicationId = "com.zdy520.hlink"
         minSdk = 24
         targetSdk = 36
